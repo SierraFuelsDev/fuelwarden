@@ -1,0 +1,196 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+FuelWarden Architecture & Coding Agent Guide
+This guide defines the architectural layout, tech stack, data models, component responsibilities, and operating rules for AI coding agents (e.g., Cursor) working on FuelWarden — a personalized meal planning platform for athletes.
+
+🔍 Project Purpose & Goals
+FuelWarden is an AI-powered nutrition platform built to help athletes align their meals with their performance goals. Its functionality spans:
+AI-generated weekly meal plans tailored to user goals, activities, and habits
+Easy tap-based meal logging and subjective feedback capture
+Weekly activity scheduling to coordinate training with nutrition
+Personalized nudges, reminders, and check-ins via CRON + notifications
+👤 Target Users: Active individuals, athletes, and gym-goers looking to improve performance through structured nutrition.
+
+⚙️ Tech Stack & Tools
+Frontend (Next.js)
+Framework: Next.js (React)
+Language: TypeScript
+Styling: Tailwind CSS + shadcn/ui components
+Form Handling: react-hook-form, zod for validation
+Backend (BaaS)
+Platform: Appwrite Cloud
+Auth: Appwrite OAuth + Email
+Database: Appwrite DB (document collections)
+Scheduled Jobs: Appwrite + CRON
+Serverless Functions: Appwrite Functions (OpenAI proxying, reminders)
+AI Layer
+Provider: OpenAI API
+Call Path: Appwrite Function → OpenAI → meal_plan
+Prompt Management: Stored in prompt_templates collection
+Deployment
+Frontend: Vercel
+Backend: Appwrite Cloud
+Notification Service: SendGrid or Resend (email/SMS)
+
+🧱 Architecture Summary
+Onboarding Flow → Populates user_profiles
+Meal Plan Generation → Calls OpenAI via Appwrite Function, stores in meal_plans
+Meal Calendar UI → Pulls from meal_plans, renders per-day views
+Meal Logging UI → Writes to meal_logs and syncs feedback
+Activity Planner → Writes to activity_schedule
+Reminder Engine → Reads meal_plans + activity_schedule, triggers via CRON
+
+🗂️ Appwrite Database Schema
+1. meal_plans
+Used to store each week's personalized plan.
+Field
+Type
+Notes
+userId
+string
+Reference to Appwrite user ID
+status
+enum
+draft, active, archived
+version
+integer
+Increments per regeneration
+generatedAt
+datetime
+Plan creation timestamp
+meals
+stringified JSON
+Array of 7 days, each with meals + macros
+planDateRange
+stringified JSON
+{ startDate, endDate }
+type
+string
+Optional categorization (e.g., template source)
+
+2. meal_logs
+Tracks user adherence and subjective response.
+Field
+Type
+Notes
+userId
+string
+User logging the meal
+mealId
+string
+Matches a meal from the active plan
+planId
+string
+ID of the plan this log relates to
+status
+enum
+followed, skipped, modified
+notes
+string
+Optional reflections
+feltFueled
+boolean
+Did the user feel fueled after this meal?
+loggedAt
+datetime
+When it was logged
+mealTime
+string
+Original scheduled time
+imageUrl
+url
+Optional upload (meal image)
+
+3. activity_schedule
+Weekly, recurring activity data.
+Field
+Type
+Notes
+userId
+string
+Required
+dayOfWeek
+enum
+"Monday" to "Sunday"
+activity
+string
+e.g., "Lift", "Run"
+intensity
+enum
+e.g., low, moderate, high
+notes
+string
+Optional
+durationMinutes
+integer
+How long the activity lasts
+timeOfDay
+string
+Time of session (e.g., "07:30")
+
+4. user_profiles
+Captured from onboarding and settings panel.
+Field
+Type
+Notes
+userId
+string
+Primary user key
+age, weightPounds, heightInches
+int
+Biometrics
+sex
+enum
+Gender ID
+wakeupTime, bedTime
+datetime
+Daily rhythm
+restrictions, preferences, goals, activities, supplements
+string[]
+Multi-selects from onboarding
+
+
+🤖 Coding Agent Instructions
+Role of Cursor
+🔧 Build frontend components using shadcn/ui and Tailwind
+🔄 Connect frontend logic to Appwrite database with SDK
+🔍 Automatically parse and stringify any nested JSON fields
+🔁 Respect document linking between collections via userId, planId, and mealId
+Responsibilities
+Area
+Included?
+Notes
+Meal calendar UI
+✅
+Renders 7-day plan from meal_plans
+Meal logging UI
+✅
+Logs to meal_logs, reflects current plan
+Profile forms
+✅
+Populates user_profiles, supports edits
+Activity planner
+✅
+Inputs and displays activity_schedule
+Data hydration
+✅
+Utilities to read/write Appwrite data
+OpenAI prompts
+❌
+Reserved for backend prompt templates
+Auth flows
+❌
+Handled via Appwrite’s prebuilt auth widgets
+
+
+⚠️ Key Notes & Rules
+JSON fields (meals, planDateRange, macros_summary) must be parsed on read, stringified on write
+Each meal_log must reference both planId and mealId for context
+Only regenerate a meal_plan if profile is updated or explicitly requested
+Always respect Appwrite document structure: use $id when storing references
+Use TypeScript for strict typing against Appwrite collections
+
+
