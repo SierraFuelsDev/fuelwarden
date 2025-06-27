@@ -24,7 +24,6 @@ const profileSchema = z.object({
   preferences: z.array(z.string()),
   goals: z.array(z.string()),
   activities: z.array(z.string()),
-  supplements: z.array(z.string()),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -81,7 +80,6 @@ export default function ProfilePage() {
       preferences: [],
       goals: [],
       activities: [],
-      supplements: [],
     },
   });
 
@@ -354,23 +352,6 @@ export default function ProfilePage() {
                             type="checkbox"
                             checked={watchedValues.activities?.includes(option)}
                             onChange={() => toggleArrayValue("activities", option)}
-                            className="text-[#ff8e01] bg-[#1c1c1e] border-[#444]"
-                          />
-                          <span className="text-white text-sm">{option}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-white">Supplements</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {SUPPLEMENT_OPTIONS.map((option) => (
-                        <label key={option} className="flex items-center space-x-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={watchedValues.supplements?.includes(option)}
-                            onChange={() => toggleArrayValue("supplements", option)}
                             className="text-[#ff8e01] bg-[#1c1c1e] border-[#444]"
                           />
                           <span className="text-white text-sm">{option}</span>
