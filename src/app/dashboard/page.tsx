@@ -8,12 +8,15 @@ import { databaseService, UserProfile } from "../../lib/database";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { useRouter } from "next/navigation";
+import { Account, Databases, ID } from "appwrite";
+import { client } from "../../lib/appwrite";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [testResult, setTestResult] = useState<string>("");
+  const [isTesting, setIsTesting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -53,6 +56,106 @@ export default function DashboardPage() {
     }
   };
 
+  const testDatabaseConnection = async () => {
+    setIsTesting(true);
+    try {
+      const result = await databaseService.testConnection();
+      setTestResult(result.message);
+    } catch (error) {
+      setTestResult(`Test failed: ${error}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const testProfileCreation = async () => {
+    if (!user?.$id) {
+      setTestResult("No user ID available. Please log in again.");
+      return;
+    }
+
+    setIsTesting(true);
+    try {
+      const sampleProfile = {
+        userId: user.$id,
+        age: 25,
+        sex: "male" as "male" | "female" | "other",
+        weightPounds: 180,
+        heightInches: 72,
+        wakeupTime: "07:00",
+        bedTime: "23:00",
+        restrictions: ["gluten-free", "dairy-free"],
+        preferences: ["high-protein", "organic"],
+        goals: ["build-muscle", "improve-performance"],
+        activities: ["strength_training", "high_intensity"]
+      };
+
+      const createdProfile = await databaseService.createUserProfile(sampleProfile);
+      setTestResult(`Profile created successfully! Profile ID: ${createdProfile.$id}`);
+      
+      // Reload the profile to show the new data
+      await loadUserProfile();
+    } catch (error: any) {
+      setTestResult(`Profile creation failed: ${error.message}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const debugPermissions = async () => {
+    setIsTesting(true);
+    try {
+      // Test 1: Check if we can list documents
+      const account = new Account(client);
+      const currentUser = await account.get();
+      
+      let debugInfo = `Current User: ${currentUser?.email} (${currentUser?.$id})\n`;
+      
+      // Test 2: Try to list documents
+      try {
+        const databases = new Databases(client);
+        const result = await databases.listDocuments(
+          "fuelwarden",
+          "user_profiles",
+          []
+        );
+        debugInfo += `✅ Can list documents: ${result.documents.length} found\n`;
+      } catch (error: any) {
+        debugInfo += `❌ Cannot list documents: ${error.message}\n`;
+      }
+      
+      // Test 3: Try to create a document
+      try {
+        const databases = new Databases(client);
+        const result = await databases.createDocument(
+          "fuelwarden",
+          "user_profiles",
+          ID.unique(),
+          {
+            userId: currentUser?.$id,
+            age: 25,
+            sex: "male",
+            weightPounds: 180,
+            heightInches: 72,
+            restrictions: [],
+            preferences: [],
+            goals: [],
+            activities: []
+          }
+        );
+        debugInfo += `✅ Can create documents: ${result.$id}\n`;
+      } catch (error: any) {
+        debugInfo += `❌ Cannot create documents: ${error.message}\n`;
+      }
+      
+      setTestResult(debugInfo);
+    } catch (error: any) {
+      setTestResult(`Debug failed: ${error.message}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   if (isLoading) {
     return <FullPageSpinner />;
   }
@@ -86,6 +189,45 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* Database Test Section */}
+          <div className="mt-6 p-4 bg-[#1c1c1e] rounded-lg">
+            <h3 className="text-white font-semibold mb-2">Database Connection Test</h3>
+            <div className="flex flex-wrap gap-2 mb-2">
+              <Button 
+                onClick={testDatabaseConnection}
+                disabled={isTesting}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isTesting ? "Testing..." : "Test Database Connection"}
+              </Button>
+              
+              <Button 
+                onClick={testProfileCreation}
+                disabled={isTesting}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isTesting ? "Creating..." : "Create Test Profile"}
+              </Button>
+              
+              <Button 
+                onClick={debugPermissions}
+                disabled={isTesting}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                {isTesting ? "Debugging..." : "Debug Permissions"}
+              </Button>
+            </div>
+            {testResult && (
+              <div className={`p-3 rounded text-sm ${
+                testResult.includes("successful") || testResult.includes("created successfully")
+                  ? "bg-green-900/20 border border-green-500/50 text-green-400" 
+                  : "bg-red-900/20 border border-red-500/50 text-red-400"
+              }`}>
+                {testResult}
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -123,6 +123,7 @@ interface OnboardingFormProps {
 export function OnboardingForm({ onComplete }: OnboardingFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string>("");
   const [searchTerms, setSearchTerms] = useState<{ [key: string]: string }>({});
   const { user } = useAuth();
   const router = useRouter();
@@ -155,11 +156,13 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
 
   const onSubmit = async (data: OnboardingFormData) => {
     if (!user?.$id) {
-      console.error("No user ID available");
+      setSubmitError("No user ID available. Please log in again.");
       return;
     }
 
     setIsSubmitting(true);
+    setSubmitError("");
+    
     try {
       const profileData: Omit<UserProfile, "$id" | "$createdAt" | "$updatedAt"> = {
         userId: user.$id,
@@ -175,11 +178,12 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         activities: data.activities,
       };
 
-      await databaseService.createUserProfile(profileData);
+      await databaseService.upsertUserProfile(profileData);
       onComplete();
       router.push("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save profile:", error);
+      setSubmitError(error.message || "Failed to save profile. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -373,28 +377,32 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     return (
       <div>
         <Label className="text-white font-medium mb-3 block text-lg">What are your main goals?</Label>
-        <p className="text-gray-400 mb-4 sm:mb-6">Select up to 3 goals.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        <p className="text-gray-400 mb-4 sm:mb-6">Select all that apply.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           {GOAL_OPTIONS.map((option) => {
             const selected = goalsArr.includes(String(option.value));
             return (
               <button
                 key={option.value}
                 type="button"
-                className={`flex items-center justify-start p-3 sm:p-5 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-16 sm:h-20 shadow-sm
+                className={`flex items-center justify-start p-3 sm:p-4 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-14 sm:h-16 shadow-sm
                   ${selected ? "bg-[#ff8e01] border-[#ff8e01] text-white" : "bg-[#232325] border-[#444] hover:border-[#ff8e01]"}
-                  ${goalsArr.length >= 3 && !selected ? "opacity-50 cursor-not-allowed" : ""}
                 `}
-                onClick={() => {
-                  if (selected) {
-                    setValue("goals", goalsArr.filter((v) => String(v) !== String(option.value)));
-                  } else if (goalsArr.length < 3) {
-                    setValue("goals", [...goalsArr, String(option.value)]);
-                  }
-                }}
-                disabled={!selected && goalsArr.length >= 3}
+                onClick={() => toggleArrayValue("goals", String(option.value))}
               >
-                <span className="text-base sm:text-lg font-semibold">{option.label}</span>
+                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-colors
+                  ${selected 
+                    ? "bg-white border-white" 
+                    : "border-[#666] bg-transparent"
+                  }`}
+                >
+                  {selected && (
+                    <svg className="w-2.5 h-2.5 text-[#ff8e01]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{option.label}</span>
               </button>
             );
           })}
@@ -455,7 +463,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     const handleSelect = (optionValue: string) => {
       if (selected.includes(String(optionValue))) {
         setValue(field as keyof OnboardingFormData, selected.filter((v) => String(v) !== String(optionValue)));
-      } else if (selected.length < 3) {
+      } else {
         setValue(field as keyof OnboardingFormData, [...selected, String(optionValue)]);
       }
     };
@@ -466,16 +474,40 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         <p className="text-gray-400 mb-4 sm:mb-6">Select up to 3 options.</p>
         <Popover>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
+            <div
+              className="w-full min-h-[48px] flex flex-wrap items-center gap-2 bg-[#1c1c1e] border border-[#444] rounded-md px-3 py-2 cursor-pointer focus-within:border-[#ff8e01] focus-within:ring-[#ff8e01] hover:border-[#ff8e01]"
+              tabIndex={0}
               role="combobox"
-              className="w-full justify-between text-left bg-[#1c1c1e] border-[#444] text-white hover:bg-[#2a2a2a] hover:border-[#ff8e01] focus:border-[#ff8e01] focus:ring-[#ff8e01] h-12"
+              aria-expanded="false"
             >
-              {selected.length > 0
-                ? selected.map((v: string) => options.find((o) => o.value === v)?.label).join(", ")
-                : placeholder}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
+              {selected.length === 0 && (
+                <span className="text-gray-400 select-none">{placeholder}</span>
+              )}
+              {selected.map((value) => {
+                const option = options.find((o) => o.value === value);
+                return (
+                  <div
+                    key={value}
+                    className="flex items-center gap-2 bg-[#ff8e01] text-white px-3 py-1 rounded-full text-sm mb-1"
+                  >
+                    <span>{option?.label}</span>
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setValue(field as keyof OnboardingFormData, selected.filter((v) => v !== value));
+                      }}
+                      className="hover:bg-[#ff9e2b] rounded-full p-1"
+                      tabIndex={-1}
+                    >
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-[#232325] border-[#444] shadow-xl max-h-[300px]">
             <div className="p-2">
@@ -507,9 +539,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
                           }
                         />
                         <span className="flex-1">{option.label}</span>
-                        {selected.length >= 3 && !selected.includes(String(option.value)) && (
-                          <span className="text-xs text-gray-500 ml-2">(Max 3)</span>
-                        )}
                       </button>
                     ))}
                   </div>
@@ -518,32 +547,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             </div>
           </PopoverContent>
         </Popover>
-        {selected.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {selected.map((value) => {
-              const option = options.find((o) => o.value === value);
-              return (
-                <div
-                  key={value}
-                  className="flex items-center gap-2 bg-[#ff8e01] text-white px-3 py-1 rounded-full text-sm"
-                >
-                  <span>{option?.label}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setValue(field as keyof OnboardingFormData, selected.filter((v) => v !== value));
-                    }}
-                    className="hover:bg-[#ff9e2b] rounded-full p-1"
-                  >
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
         {errors[field as keyof OnboardingFormData] && (
           <p className="text-red-400 text-sm mt-2">{errors[field as keyof OnboardingFormData]?.message}</p>
         )}
@@ -556,7 +559,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     return (
       <div>
         <Label className="text-white font-medium mb-3 block text-lg">What are your food preferences?</Label>
-        <p className="text-gray-400 mb-4 sm:mb-6">Select up to 3 preferences.</p>
+        <p className="text-gray-400 mb-4 sm:mb-6">Select all that apply.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           {PREFERENCE_OPTIONS.map((option) => {
             const selected = preferencesArr.includes(String(option.value));
@@ -564,20 +567,24 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
               <button
                 key={option.value}
                 type="button"
-                className={`flex flex-col items-center justify-center p-3 sm:p-5 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-20 sm:h-28 shadow-sm
+                className={`flex items-center justify-start p-3 sm:p-4 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-14 sm:h-16 shadow-sm
                   ${selected ? "bg-[#ff8e01] border-[#ff8e01] text-white" : "bg-[#232325] border-[#444] hover:border-[#ff8e01]"}
-                  ${preferencesArr.length >= 3 && !selected ? "opacity-50 cursor-not-allowed" : ""}
                 `}
-                onClick={() => {
-                  if (selected) {
-                    setValue("preferences", preferencesArr.filter((v) => String(v) !== String(option.value)));
-                  } else if (preferencesArr.length < 3) {
-                    setValue("preferences", [...preferencesArr, String(option.value)]);
-                  }
-                }}
-                disabled={!selected && preferencesArr.length >= 3}
+                onClick={() => toggleArrayValue("preferences", String(option.value))}
               >
-                <span className="text-base sm:text-lg font-semibold mb-1 sm:mb-2 text-center">{option.label}</span>
+                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-colors
+                  ${selected 
+                    ? "bg-white border-white" 
+                    : "border-[#666] bg-transparent"
+                  }`}
+                >
+                  {selected && (
+                    <svg className="w-2.5 h-2.5 text-[#ff8e01]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{option.label}</span>
               </button>
             );
           })}
@@ -670,6 +677,13 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       </div>
       <Card className="bg-[#232325] border-[#333] shadow-xl">
         <CardContent className="p-4 sm:p-6 lg:p-8">
+          {/* Error Message */}
+          {submitError && (
+            <div className="mb-6 p-4 rounded-lg bg-red-900/20 border border-red-500/50 text-red-400">
+              {submitError}
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}

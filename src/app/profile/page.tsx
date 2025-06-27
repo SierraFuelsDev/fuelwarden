@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ProtectedRoute } from "../../components/auth/ProtectedRoute";
 import { FullPageSpinner } from "../../components/auth/LoadingSpinner";
 import { useAuth } from "../../contexts/AuthContext";
+import { databaseService, UserProfile } from "../../lib/database";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -58,7 +59,15 @@ export default function ProfilePage() {
   const { user, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userStats, setUserStats] = useState<{
+    totalMealLogs: number;
+    totalMealPlans: number;
+    totalActivities: number;
+    profileComplete: boolean;
+  } | null>(null);
 
   const {
     control,
@@ -86,19 +95,97 @@ export default function ProfilePage() {
   const watchedValues = watch();
 
   useEffect(() => {
-    // TODO: Load profile data from database
-    setIsLoading(false);
-  }, [user]);
+    const loadProfile = async () => {
+      if (!user?.$id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const [profile, stats] = await Promise.all([
+          databaseService.getUserProfile(user.$id),
+          databaseService.getUserStats(user.$id)
+        ]);
+        
+        setUserProfile(profile);
+        setUserStats(stats);
+        
+        if (profile) {
+          // Populate form with existing data
+          reset({
+            age: profile.age,
+            sex: profile.sex,
+            weightPounds: profile.weightPounds,
+            heightInches: profile.heightInches,
+            wakeupTime: profile.wakeupTime || "",
+            bedTime: profile.bedTime || "",
+            restrictions: profile.restrictions || [],
+            preferences: profile.preferences || [],
+            goals: profile.goals || [],
+            activities: profile.activities || [],
+          });
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error);
+        setSaveMessage("Failed to load profile data. Please refresh the page.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [user, reset]);
 
   const onSubmit = async (data: ProfileFormData) => {
+    if (!user?.$id) {
+      setSaveMessage("No user ID available. Please log in again.");
+      return;
+    }
+
     setIsSaving(true);
     setSaveMessage("");
 
     try {
-      // TODO: Implement database update functionality
-      console.log("Profile data to update:", data);
+      if (userProfile) {
+        // Update existing profile
+        await databaseService.updateUserProfile(userProfile.$id!, {
+          age: data.age,
+          sex: data.sex,
+          weightPounds: data.weightPounds,
+          heightInches: data.heightInches,
+          wakeupTime: data.wakeupTime,
+          bedTime: data.bedTime,
+          restrictions: data.restrictions,
+          preferences: data.preferences,
+          goals: data.goals,
+          activities: data.activities,
+        });
+      } else {
+        // Create new profile
+        await databaseService.createUserProfile({
+          userId: user.$id,
+          age: data.age,
+          sex: data.sex,
+          weightPounds: data.weightPounds,
+          heightInches: data.heightInches,
+          wakeupTime: data.wakeupTime,
+          bedTime: data.bedTime,
+          restrictions: data.restrictions,
+          preferences: data.preferences,
+          goals: data.goals,
+          activities: data.activities,
+        });
+      }
       
       setSaveMessage("Profile updated successfully!");
+      
+      // Reload profile data and stats
+      const [updatedProfile, updatedStats] = await Promise.all([
+        databaseService.getUserProfile(user.$id),
+        databaseService.getUserStats(user.$id)
+      ]);
+      setUserProfile(updatedProfile);
+      setUserStats(updatedStats);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSaveMessage(""), 3000);
@@ -107,6 +194,49 @@ export default function ProfilePage() {
       setSaveMessage("Failed to update profile. Please try again.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!user?.$id || !userProfile?.$id) {
+      setSaveMessage("No profile to delete.");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete your profile? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setSaveMessage("");
+
+    try {
+      await databaseService.deleteUserProfile(userProfile.$id, user.$id);
+      setUserProfile(null);
+      setUserStats(null);
+      setSaveMessage("Profile deleted successfully!");
+      
+      // Reset form to default values
+      reset({
+        age: 0,
+        sex: "male" as "male" | "female" | "other",
+        weightPounds: 0,
+        heightInches: 0,
+        wakeupTime: "",
+        bedTime: "",
+        restrictions: [],
+        preferences: [],
+        goals: [],
+        activities: [],
+      });
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSaveMessage(""), 3000);
+    } catch (error) {
+      console.error("Error deleting profile:", error);
+      setSaveMessage("Failed to delete profile. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -130,7 +260,52 @@ export default function ProfilePage() {
           <p className="text-gray-400 mt-2">Manage your personal information and preferences</p>
         </div>
 
+        {/* Success/Error Message */}
+        {saveMessage && (
+          <div className={`mb-6 p-4 rounded-lg ${
+            saveMessage.includes("successfully") 
+              ? "bg-green-900/20 border border-green-500/50 text-green-400" 
+              : "bg-red-900/20 border border-red-500/50 text-red-400"
+          }`}>
+            {saveMessage}
+          </div>
+        )}
+
         <div className="grid gap-6">
+          {/* User Statistics */}
+          {userStats && (
+            <Card className="bg-[#232325] border-[#333]">
+              <CardHeader>
+                <CardTitle className="text-white">Your Activity</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Overview of your FuelWarden usage
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-[#1c1c1e] rounded-lg border border-[#444]">
+                    <div className="text-2xl font-bold text-[#ff8e01]">{userStats.totalMealLogs}</div>
+                    <div className="text-sm text-gray-400">Meal Logs</div>
+                  </div>
+                  <div className="text-center p-4 bg-[#1c1c1e] rounded-lg border border-[#444]">
+                    <div className="text-2xl font-bold text-[#ff8e01]">{userStats.totalMealPlans}</div>
+                    <div className="text-sm text-gray-400">Meal Plans</div>
+                  </div>
+                  <div className="text-center p-4 bg-[#1c1c1e] rounded-lg border border-[#444]">
+                    <div className="text-2xl font-bold text-[#ff8e01]">{userStats.totalActivities}</div>
+                    <div className="text-sm text-gray-400">Activities</div>
+                  </div>
+                  <div className="text-center p-4 bg-[#1c1c1e] rounded-lg border border-[#444]">
+                    <div className="text-2xl font-bold text-[#ff8e01]">
+                      {userStats.profileComplete ? "✓" : "✗"}
+                    </div>
+                    <div className="text-sm text-gray-400">Profile Complete</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Account Information */}
           <Card className="bg-[#232325] border-[#333]">
             <CardHeader>
@@ -403,6 +578,12 @@ export default function ProfilePage() {
                   className="w-full bg-red-600 hover:bg-red-700 text-white"
                 >
                   Sign Out
+                </Button>
+                <Button 
+                  onClick={handleDeleteProfile}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Delete Profile
                 </Button>
               </div>
             </CardContent>
