@@ -85,7 +85,7 @@ export interface UserProfile {
   preferences: string[];
   goals: string[];
   activities: string[];
-  supplements: string[];
+  supplements?: string[];
   $createdAt?: string;
   $updatedAt?: string;
 }

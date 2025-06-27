@@ -45,17 +45,12 @@ const foodPreferencesSchema = z.object({
   preferences: z.array(z.string()),
 });
 
-const supplementsSchema = z.object({
-  supplements: z.array(z.string()),
-});
-
 const fullSchema = basicInfoSchema
   .merge(scheduleSchema)
   .merge(activitiesSchema)
   .merge(goalsSchema)
   .merge(dietarySchema)
-  .merge(foodPreferencesSchema)
-  .merge(supplementsSchema);
+  .merge(foodPreferencesSchema);
 
 type OnboardingFormData = {
   age: number;
@@ -68,7 +63,6 @@ type OnboardingFormData = {
   goals: string[];
   restrictions: string[];
   preferences: string[];
-  supplements: string[];
 };
 
 // Predefined options for multi-select fields
@@ -112,30 +106,14 @@ const GOAL_OPTIONS = [
 ];
 
 const ACTIVITY_OPTIONS = [
-  { value: "weightlifting", label: "Weightlifting" },
-  { value: "running", label: "Running" },
-  { value: "cycling", label: "Cycling" },
-  { value: "swimming", label: "Swimming" },
-  { value: "yoga", label: "Yoga" },
-  { value: "crossfit", label: "CrossFit" },
-  { value: "team-sports", label: "Team sports" },
-  { value: "hiking", label: "Hiking" },
-  { value: "martial-arts", label: "Martial arts" },
-  { value: "dancing", label: "Dancing" },
-  { value: "walking", label: "Walking" },
-  { value: "other", label: "Other" }
-];
-
-const SUPPLEMENT_OPTIONS = [
-  { value: "protein-powder", label: "Protein powder" },
-  { value: "creatine", label: "Creatine" },
-  { value: "bcaas", label: "BCAAs" },
-  { value: "multivitamin", label: "Multivitamin" },
-  { value: "omega-3", label: "Omega-3" },
-  { value: "vitamin-d", label: "Vitamin D" },
-  { value: "pre-workout", label: "Pre-workout" },
-  { value: "post-workout", label: "Post-workout" },
-  { value: "none", label: "None" }
+  { value: "strength_training", label: "Strength Training (e.g., Weightlifting, Powerlifting)" },
+  { value: "high_intensity", label: "High-Intensity Training (e.g., CrossFit, HIIT)" },
+  { value: "endurance", label: "Endurance Cardio (e.g., Running, Cycling, Rowing)" },
+  { value: "team_sports", label: "Team Sports (e.g., Soccer, Basketball, Hockey)" },
+  { value: "combat_sports", label: "Combat Sports (e.g., MMA, Boxing, Wrestling)" },
+  { value: "recreational", label: "Recreational Movement (e.g., Hiking, Pickleball)" },
+  { value: "mobility_focus", label: "Mobility/Recovery Focused (e.g., Yoga, Pilates)" },
+  { value: "other", label: "Other or Custom Routine" }
 ];
 
 interface OnboardingFormProps {
@@ -145,6 +123,7 @@ interface OnboardingFormProps {
 export function OnboardingForm({ onComplete }: OnboardingFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerms, setSearchTerms] = useState<{ [key: string]: string }>({});
   const { user } = useAuth();
   const router = useRouter();
 
@@ -168,7 +147,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       preferences: [] as string[],
       goals: [] as string[],
       activities: [] as string[],
-      supplements: [] as string[],
     },
     mode: "onChange",
   });
@@ -195,7 +173,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         preferences: data.preferences,
         goals: data.goals,
         activities: data.activities,
-        supplements: data.supplements,
       };
 
       await databaseService.createUserProfile(profileData);
@@ -212,7 +189,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     const fieldsToValidate = getFieldsForStep(currentStep);
     const isValid = await trigger(fieldsToValidate);
     
-    if (isValid && currentStep < 7) {
+    if (isValid && currentStep < 6) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -223,7 +200,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     }
   };
 
-  const TOTAL_STEPS = 7;
+  const TOTAL_STEPS = 6;
   const getFieldsForStep = (step: number): (keyof OnboardingFormData)[] => {
     switch (step) {
       case 1:
@@ -238,8 +215,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         return ["restrictions"];
       case 6:
         return ["preferences"];
-      case 7:
-        return ["supplements"];
       default:
         return [];
     }
@@ -472,6 +447,18 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
   const renderCombobox = (field: string, options: { value: string; label: string }[], label: string, placeholder: string) => {
     const raw = watchedValues[field as keyof OnboardingFormData];
     const selected: string[] = Array.isArray(raw) ? raw.map(String) : [];
+    const searchTerm = searchTerms[field] || "";
+    const filteredOptions = options.filter(option =>
+      option.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleSelect = (optionValue: string) => {
+      if (selected.includes(String(optionValue))) {
+        setValue(field as keyof OnboardingFormData, selected.filter((v) => String(v) !== String(optionValue)));
+      } else if (selected.length < 3) {
+        setValue(field as keyof OnboardingFormData, [...selected, String(optionValue)]);
+      }
+    };
 
     return (
       <div>
@@ -491,42 +478,44 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-[#232325] border-[#444] shadow-xl max-h-[300px]">
-            <Command className="bg-[#232325]">
-              <CommandInput 
-                placeholder={`Search ${label.toLowerCase()}...`} 
-                className="h-10 bg-[#1c1c1e] border-[#444] text-white placeholder:text-gray-400 focus:border-[#ff8e01] focus:ring-[#ff8e01] rounded-none border-b border-[#444]" 
+            <div className="p-2">
+              <Input
+                placeholder={`Search ${label.toLowerCase()}...`}
+                className="h-10 bg-[#1c1c1e] border-[#444] text-white placeholder:text-gray-400 focus:border-[#ff8e01] focus:ring-[#ff8e01] mb-2"
+                value={searchTerm}
+                onChange={e => setSearchTerms(prev => ({ ...prev, [field]: e.target.value }))}
               />
-              <CommandList className="bg-[#232325] max-h-[250px] overflow-y-auto">
-                <CommandEmpty className="text-gray-400 py-4 text-center">No options found.</CommandEmpty>
-                <CommandGroup className="bg-[#232325]">
-                  {options.map((option) => (
-                    <CommandItem
-                      key={option.value}
-                      className="text-white hover:bg-[#1c1c1e] focus:bg-[#1c1c1e] cursor-pointer py-3 px-4"
-                      onSelect={() => {
-                        if (selected.includes(String(option.value))) {
-                          setValue(field as keyof OnboardingFormData, selected.filter((v) => String(v) !== String(option.value)));
-                        } else if (selected.length < 3) {
-                          setValue(field as keyof OnboardingFormData, [...selected, String(option.value)]);
-                        }
-                      }}
-                    >
-                      <Check
-                        className={
-                          selected.includes(String(option.value))
-                            ? "mr-3 h-4 w-4 opacity-100 text-[#ff8e01]"
-                            : "mr-3 h-4 w-4 opacity-0"
-                        }
-                      />
-                      <span className="flex-1">{option.label}</span>
-                      {selected.length >= 3 && !selected.includes(String(option.value)) && (
-                        <span className="text-xs text-gray-500 ml-2">(Max 3)</span>
-                      )}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
+              <div className="max-h-[250px] overflow-y-auto">
+                {filteredOptions.length === 0 ? (
+                  <div className="text-gray-400 py-4 text-center">No options found.</div>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 rounded-md text-white hover:bg-[#1c1c1e] focus:bg-[#1c1c1e] cursor-pointer flex items-center ${
+                          selected.includes(String(option.value)) ? 'bg-[#ff8e01] text-white' : ''
+                        }`}
+                        onClick={() => handleSelect(option.value)}
+                      >
+                        <Check
+                          className={
+                            selected.includes(String(option.value))
+                              ? "mr-3 h-4 w-4 opacity-100 text-white"
+                              : "mr-3 h-4 w-4 opacity-0"
+                          }
+                        />
+                        <span className="flex-1">{option.label}</span>
+                        {selected.length >= 3 && !selected.includes(String(option.value)) && (
+                          <span className="text-xs text-gray-500 ml-2">(Max 3)</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </PopoverContent>
         </Popover>
         {selected.length > 0 && (
@@ -598,8 +587,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     );
   };
 
-  const renderSupplementsStep = () => renderCombobox("supplements", SUPPLEMENT_OPTIONS, "Supplements", "Select your supplements");
-
   const getStepInfo = (step: number) => {
     switch (step) {
       case 1:
@@ -641,13 +628,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         return {
           title: "Food Preferences",
           description: "Tell us about your food preferences",
-          icon: Target,
-          color: "text-purple-400"
-        };
-      case 7:
-        return {
-          title: "Supplements",
-          description: "Tell us about your supplement preferences",
           icon: Target,
           color: "text-purple-400"
         };
@@ -697,7 +677,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             {currentStep === 4 && renderGoalsStep()}
             {currentStep === 5 && renderDietaryStep()}
             {currentStep === 6 && renderFoodPreferencesStep()}
-            {currentStep === 7 && renderSupplementsStep()}
             <div className="flex flex-col sm:flex-row sm:justify-between pt-6 sm:pt-8 border-t border-[#444] space-y-4 sm:space-y-0">
               <Button
                 type="button"
