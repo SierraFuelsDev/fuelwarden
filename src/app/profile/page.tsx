@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { ProtectedRoute } from "../../components/auth/ProtectedRoute";
 import { FullPageSpinner } from "../../components/auth/LoadingSpinner";
 import { useAuth } from "../../contexts/AuthContext";
-import { databaseService, UserProfile } from "../../lib/database";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -58,7 +57,6 @@ const SUPPLEMENT_OPTIONS = [
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -73,6 +71,12 @@ export default function ProfilePage() {
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
+      age: 0,
+      sex: "male" as "male" | "female" | "other",
+      weightPounds: 0,
+      heightInches: 0,
+      wakeupTime: "",
+      bedTime: "",
       restrictions: [],
       preferences: [],
       goals: [],
@@ -84,62 +88,18 @@ export default function ProfilePage() {
   const watchedValues = watch();
 
   useEffect(() => {
-    loadProfile();
+    // TODO: Load profile data from database
+    setIsLoading(false);
   }, [user]);
 
-  const loadProfile = async () => {
-    if (!user?.$id) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const userProfile = await databaseService.getUserProfile(user.$id);
-      if (userProfile) {
-        setProfile(userProfile);
-        reset({
-          age: userProfile.age,
-          sex: userProfile.sex,
-          weightPounds: userProfile.weightPounds,
-          heightInches: userProfile.heightInches,
-          wakeupTime: userProfile.wakeupTime || "",
-          bedTime: userProfile.bedTime || "",
-          restrictions: userProfile.restrictions,
-          preferences: userProfile.preferences,
-          goals: userProfile.goals,
-          activities: userProfile.activities,
-          supplements: userProfile.supplements,
-        });
-      }
-    } catch (error) {
-      console.error("Error loading profile:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const onSubmit = async (data: ProfileFormData) => {
-    if (!profile?.$id) return;
-
     setIsSaving(true);
     setSaveMessage("");
 
     try {
-      const updatedProfile = await databaseService.updateUserProfile(profile.$id, {
-        age: data.age,
-        sex: data.sex,
-        weightPounds: data.weightPounds,
-        heightInches: data.heightInches,
-        wakeupTime: data.wakeupTime,
-        bedTime: data.bedTime,
-        restrictions: data.restrictions,
-        preferences: data.preferences,
-        goals: data.goals,
-        activities: data.activities,
-        supplements: data.supplements,
-      });
-
-      setProfile(updatedProfile);
+      // TODO: Implement database update functionality
+      console.log("Profile data to update:", data);
+      
       setSaveMessage("Profile updated successfully!");
       
       // Clear success message after 3 seconds
@@ -223,6 +183,7 @@ export default function ProfilePage() {
                           {...field}
                           type="number"
                           id="age"
+                          value={field.value === 0 ? "" : field.value}
                           className="bg-[#1c1c1e] border-[#444] text-white"
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                         />
@@ -267,6 +228,7 @@ export default function ProfilePage() {
                           {...field}
                           type="number"
                           id="weight"
+                          value={field.value === 0 ? "" : field.value}
                           className="bg-[#1c1c1e] border-[#444] text-white"
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                         />
@@ -285,6 +247,7 @@ export default function ProfilePage() {
                           {...field}
                           type="number"
                           id="height"
+                          value={field.value === 0 ? "" : field.value}
                           className="bg-[#1c1c1e] border-[#444] text-white"
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                         />

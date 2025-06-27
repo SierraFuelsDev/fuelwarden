@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [testResult, setTestResult] = useState<string>("");
   const router = useRouter();
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function DashboardPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white">Dashboard</h1>
           <p className="text-gray-400 mt-2">Welcome back, {user?.name || 'User'}!</p>
+          
           {profile && (
             <div className="mt-4 p-4 bg-[#1c1c1e] rounded-lg">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
