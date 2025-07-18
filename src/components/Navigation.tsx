@@ -50,7 +50,7 @@ export function Navigation() {
 
             {/* User Menu / Auth Button */}
             <div className="flex items-center space-x-4">
-              {isAuthenticated ? (
+              {isAuthenticated && (
                 <div className="relative">
                   <Button
                     variant="ghost"
@@ -92,12 +92,6 @@ export function Navigation() {
                     </div>
                   )}
                 </div>
-              ) : (
-                <Link href="/auth">
-                  <Button className="bg-[#ff8e01] hover:bg-[#ff9e2b] text-white">
-                    Get Started
-                  </Button>
-                </Link>
               )}
             </div>
           </div>

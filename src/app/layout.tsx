@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FuelWarden - Smart Nutrition Tracking",
-  description: "Track your meals, plan your nutrition, and achieve your health goals with FuelWarden.",
+  title: "FuelWarden",
+  description: "Smart nutrition tracking and meal planning app.",
 };
 
 export default function RootLayout({
