@@ -1,20 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "../../contexts/AuthContext";
-import { databaseService, UserProfile } from "../../lib/database";
+import { databaseService, UserProfileForm, ActivityScheduleForm, ActivityScheduleItem } from "../../lib/database";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, User, Clock, Target } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, User, Clock, Target, Calendar, Plus, Trash2 } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "../ui/command";
 import { ChevronsUpDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 // Form validation schemas for each step
 const basicInfoSchema = z.object({
@@ -45,13 +46,26 @@ const foodPreferencesSchema = z.object({
   preferences: z.array(z.string()),
 });
 
+const weeklyScheduleSchema = z.object({
+  weeklySchedule: z.array(z.object({
+    dayOfWeek: z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
+    timeOfDay: z.enum(["morning", "afternoon", "evening"]),
+    activity: z.string().optional(), // Make optional since we filter out empty ones
+    intensity: z.enum(["light", "moderate", "intense"]),
+    durationMinutes: z.number().min(15, "Duration must be at least 15 minutes").max(300, "Duration must be less than 5 hours").optional(),
+    notes: z.string().optional(),
+  })).optional(),
+});
+
 const fullSchema = basicInfoSchema
   .merge(scheduleSchema)
   .merge(activitiesSchema)
   .merge(goalsSchema)
   .merge(dietarySchema)
-  .merge(foodPreferencesSchema);
+  .merge(foodPreferencesSchema)
+  .merge(weeklyScheduleSchema);
 
+// Form data type that allows optional activity fields
 type OnboardingFormData = {
   age: number;
   sex: "male" | "female" | "other";
@@ -63,6 +77,14 @@ type OnboardingFormData = {
   goals: string[];
   restrictions: string[];
   preferences: string[];
+  weeklySchedule?: Array<{
+    dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+    timeOfDay: "morning" | "afternoon" | "evening";
+    activity?: string;
+    intensity: "light" | "moderate" | "intense";
+    durationMinutes?: number;
+    notes?: string;
+  }>;
 };
 
 // Predefined options for multi-select fields
@@ -116,17 +138,63 @@ const ACTIVITY_OPTIONS = [
   { value: "other", label: "Other or Custom Routine" }
 ];
 
+const DAYS_OF_WEEK = [
+  { value: "Monday", label: "Monday" },
+  { value: "Tuesday", label: "Tuesday" },
+  { value: "Wednesday", label: "Wednesday" },
+  { value: "Thursday", label: "Thursday" },
+  { value: "Friday", label: "Friday" },
+  { value: "Saturday", label: "Saturday" },
+  { value: "Sunday", label: "Sunday" },
+];
+
+const TIME_OF_DAY_OPTIONS = [
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "evening", label: "Evening" },
+];
+
+const INTENSITY_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "moderate", label: "Moderate" },
+  { value: "intense", label: "Intense" },
+];
+
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: "running", label: "Running" },
+  { value: "cycling", label: "Cycling" },
+  { value: "swimming", label: "Swimming" },
+  { value: "weightlifting", label: "Weightlifting" },
+  { value: "yoga", label: "Yoga" },
+  { value: "pilates", label: "Pilates" },
+  { value: "hiit", label: "HIIT" },
+  { value: "crossfit", label: "CrossFit" },
+  { value: "basketball", label: "Basketball" },
+  { value: "soccer", label: "Soccer" },
+  { value: "tennis", label: "Tennis" },
+  { value: "hiking", label: "Hiking" },
+  { value: "walking", label: "Walking" },
+  { value: "dancing", label: "Dancing" },
+  { value: "boxing", label: "Boxing" },
+  { value: "martial_arts", label: "Martial Arts" },
+  { value: "other", label: "Other" },
+];
+
 interface OnboardingFormProps {
   onComplete: () => void;
+  setIsOnboarding: (val: boolean) => void;
 }
 
-export function OnboardingForm({ onComplete }: OnboardingFormProps) {
+export function OnboardingForm({ onComplete, setIsOnboarding }: OnboardingFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [searchTerms, setSearchTerms] = useState<{ [key: string]: string }>({});
   const { user } = useAuth();
   const router = useRouter();
+
+  // Debug logging
+  console.log("OnboardingForm render", { currentStep, isSubmitting, submitError });
 
   const {
     control,
@@ -148,13 +216,22 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       preferences: [] as string[],
       goals: [] as string[],
       activities: [] as string[],
+      weeklySchedule: [] as OnboardingFormData['weeklySchedule'],
     },
-    mode: "onChange",
+    mode: "onSubmit",
   });
 
   const watchedValues = watch();
 
   const onSubmit = async (data: OnboardingFormData) => {
+    console.log("onSubmit called", { currentStep, TOTAL_STEPS, data });
+    
+    // Only submit if we're on the final step
+    if (currentStep !== TOTAL_STEPS) {
+      console.log("Not on final step, returning early");
+      return;
+    }
+    
     if (!user?.$id) {
       setSubmitError("No user ID available. Please log in again.");
       return;
@@ -164,7 +241,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     setSubmitError("");
     
     try {
-      const profileData: Omit<UserProfile, "$id" | "$createdAt" | "$updatedAt"> = {
+      const profileData: Omit<UserProfileForm, "$id" | "$createdAt" | "$updatedAt"> = {
         userId: user.$id,
         age: data.age,
         sex: data.sex,
@@ -178,7 +255,32 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         activities: data.activities,
       };
 
+      console.log("Saving profile data:", profileData);
       await databaseService.upsertUserProfile(profileData);
+
+      // Save activity schedule if provided, filtering out incomplete activities
+      if (data.weeklySchedule && data.weeklySchedule.length > 0) {
+        // Filter out activities with empty activity fields
+        const validSchedule = data.weeklySchedule.filter(activity => 
+          activity.activity && activity.activity.trim() !== ""
+        ).map(activity => ({
+          ...activity,
+          activity: activity.activity! // TypeScript now knows this is not undefined
+        })) as ActivityScheduleItem[];
+        
+        console.log("Valid schedule to save:", validSchedule);
+        
+        if (validSchedule.length > 0) {
+          const scheduleData: Omit<ActivityScheduleForm, "$id" | "$createdAt" | "$updatedAt"> = {
+            userId: user.$id,
+            schedule: validSchedule,
+          };
+          await databaseService.upsertActivitySchedule(scheduleData);
+        }
+      }
+
+      console.log("Profile and schedule saved successfully, completing onboarding");
+      // Only complete and redirect after everything is saved
       onComplete();
       router.push("/dashboard");
     } catch (error: any) {
@@ -190,10 +292,14 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
   };
 
   const nextStep = async () => {
+    console.log("nextStep called", { currentStep, TOTAL_STEPS });
     const fieldsToValidate = getFieldsForStep(currentStep);
     const isValid = await trigger(fieldsToValidate);
     
-    if (isValid && currentStep < 6) {
+    console.log("nextStep validation result", { isValid, fieldsToValidate });
+    
+    if (isValid && currentStep < TOTAL_STEPS) {
+      console.log("Moving to next step", { from: currentStep, to: currentStep + 1 });
       setCurrentStep(currentStep + 1);
     }
   };
@@ -204,7 +310,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     }
   };
 
-  const TOTAL_STEPS = 6;
+  const TOTAL_STEPS = 7;
   const getFieldsForStep = (step: number): (keyof OnboardingFormData)[] => {
     switch (step) {
       case 1:
@@ -219,6 +325,8 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         return ["restrictions"];
       case 6:
         return ["preferences"];
+      case 7:
+        return []; // Weekly schedule is optional, no validation needed
       default:
         return [];
     }
@@ -372,86 +480,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     return renderCombobox("activities", ACTIVITY_OPTIONS, "What types of activities do you like to do?", "Select up to 3 activities");
   };
 
-  const renderGoalsStep = () => {
-    const goalsArr: string[] = Array.isArray(watchedValues.goals) ? watchedValues.goals.map(String) : [];
-    return (
-      <div>
-        <Label className="text-white font-medium mb-3 block text-lg">What are your main goals?</Label>
-        <p className="text-gray-400 mb-4 sm:mb-6">Select all that apply.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-          {GOAL_OPTIONS.map((option) => {
-            const selected = goalsArr.includes(String(option.value));
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className={`flex items-center justify-start p-3 sm:p-4 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-14 sm:h-16 shadow-sm
-                  ${selected ? "bg-[#ff8e01] border-[#ff8e01] text-white" : "bg-[#232325] border-[#444] hover:border-[#ff8e01]"}
-                `}
-                onClick={() => toggleArrayValue("goals", String(option.value))}
-              >
-                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-colors
-                  ${selected 
-                    ? "bg-white border-white" 
-                    : "border-[#666] bg-transparent"
-                  }`}
-                >
-                  {selected && (
-                    <svg className="w-2.5 h-2.5 text-[#ff8e01]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-                <span className="font-medium">{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {errors.goals && <p className="text-red-400 text-sm mt-2">{errors.goals.message}</p>}
-      </div>
-    );
-  };
-
-  const renderDietaryStep = () => {
-    const restrictionsArr: string[] = Array.isArray(watchedValues.restrictions) ? watchedValues.restrictions.map(String) : [];
-    return (
-      <div>
-        <Label className="text-white font-medium mb-3 block text-lg">Do you have any dietary restrictions?</Label>
-        <p className="text-gray-400 mb-4 sm:mb-6">Select all that apply.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-          {RESTRICTION_OPTIONS.map((option) => {
-            const selected = restrictionsArr.includes(String(option.value));
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className={`flex items-center justify-start p-3 sm:p-4 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-14 sm:h-16 shadow-sm
-                  ${selected ? "bg-[#ff8e01] border-[#ff8e01] text-white" : "bg-[#232325] border-[#444] hover:border-[#ff8e01]"}
-                `}
-                onClick={() => toggleArrayValue("restrictions", String(option.value))}
-              >
-                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-colors
-                  ${selected 
-                    ? "bg-white border-white" 
-                    : "border-[#666] bg-transparent"
-                  }`}
-                >
-                  {selected && (
-                    <svg className="w-2.5 h-2.5 text-[#ff8e01]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-                <span className="font-medium">{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {errors.restrictions && <p className="text-red-400 text-sm mt-2">{errors.restrictions.message}</p>}
-      </div>
-    );
-  };
-
   const renderCombobox = (field: string, options: { value: string; label: string }[], label: string, placeholder: string) => {
     const raw = watchedValues[field as keyof OnboardingFormData];
     const selected: string[] = Array.isArray(raw) ? raw.map(String) : [];
@@ -554,6 +582,86 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     );
   };
 
+  const renderGoalsStep = () => {
+    const goalsArr: string[] = Array.isArray(watchedValues.goals) ? watchedValues.goals.map(String) : [];
+    return (
+      <div>
+        <Label className="text-white font-medium mb-3 block text-lg">What are your main goals?</Label>
+        <p className="text-gray-400 mb-4 sm:mb-6">Select all that apply.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+          {GOAL_OPTIONS.map((option) => {
+            const selected = goalsArr.includes(String(option.value));
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`flex items-center justify-start p-3 sm:p-4 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-14 sm:h-16 shadow-sm
+                  ${selected ? "bg-[#ff8e01] border-[#ff8e01] text-white" : "bg-[#232325] border-[#444] hover:border-[#ff8e01]"}
+                `}
+                onClick={() => toggleArrayValue("goals", String(option.value))}
+              >
+                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-colors
+                  ${selected 
+                    ? "bg-white border-white" 
+                    : "border-[#666] bg-transparent"
+                  }`}
+                >
+                  {selected && (
+                    <svg className="w-2.5 h-2.5 text-[#ff8e01]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {errors.goals && <p className="text-red-400 text-sm mt-2">{errors.goals.message}</p>}
+      </div>
+    );
+  };
+
+  const renderDietaryStep = () => {
+    const restrictionsArr: string[] = Array.isArray(watchedValues.restrictions) ? watchedValues.restrictions.map(String) : [];
+    return (
+      <div>
+        <Label className="text-white font-medium mb-3 block text-lg">Do you have any dietary restrictions?</Label>
+        <p className="text-gray-400 mb-4 sm:mb-6">Select all that apply.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+          {RESTRICTION_OPTIONS.map((option) => {
+            const selected = restrictionsArr.includes(String(option.value));
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`flex items-center justify-start p-3 sm:p-4 rounded-xl border transition-colors text-white font-medium text-sm sm:text-base h-14 sm:h-16 shadow-sm
+                  ${selected ? "bg-[#ff8e01] border-[#ff8e01] text-white" : "bg-[#232325] border-[#444] hover:border-[#ff8e01]"}
+                `}
+                onClick={() => toggleArrayValue("restrictions", String(option.value))}
+              >
+                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center transition-colors
+                  ${selected 
+                    ? "bg-white border-white" 
+                    : "border-[#666] bg-transparent"
+                  }`}
+                >
+                  {selected && (
+                    <svg className="w-2.5 h-2.5 text-[#ff8e01]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {errors.restrictions && <p className="text-red-400 text-sm mt-2">{errors.restrictions.message}</p>}
+      </div>
+    );
+  };
+
   const renderFoodPreferencesStep = () => {
     const preferencesArr: string[] = Array.isArray(watchedValues.preferences) ? watchedValues.preferences.map(String) : [];
     return (
@@ -590,6 +698,204 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
           })}
         </div>
         {errors.preferences && <p className="text-red-400 text-sm mt-2">{errors.preferences.message}</p>}
+      </div>
+    );
+  };
+
+  const renderWeeklyScheduleStep = () => {
+    const weeklySchedule = watchedValues.weeklySchedule || [];
+
+    const addActivity = () => {
+      console.log("addActivity called", { currentStep, weeklySchedule });
+      const newActivity = {
+        dayOfWeek: "Monday" as const,
+        timeOfDay: "morning" as const,
+        activity: "",
+        intensity: "moderate" as const,
+        durationMinutes: 60,
+        notes: "",
+      };
+      console.log("Adding new activity:", newActivity);
+      setValue("weeklySchedule", [...weeklySchedule, newActivity]);
+      console.log("Activity added successfully");
+    };
+
+    const removeActivity = (index: number) => {
+      const updatedSchedule = weeklySchedule.filter((_, i) => i !== index);
+      setValue("weeklySchedule", updatedSchedule);
+    };
+
+    const updateActivity = (index: number, field: string, value: any) => {
+      const updatedSchedule = [...weeklySchedule];
+      updatedSchedule[index] = { ...updatedSchedule[index], [field]: value };
+      setValue("weeklySchedule", updatedSchedule);
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-6">
+          <p className="text-gray-400">Tell us about your weekly fitness routine to help us plan your nutrition</p>
+        </div>
+
+        {weeklySchedule.length === 0 ? (
+          <div className="text-center py-8">
+            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-400 mb-4">No activities scheduled yet</p>
+            <Button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addActivity();
+              }}
+              className="bg-[#ff8e01] hover:bg-[#ff9e2b] text-white"
+            >
+              <Plus size={16} className="mr-2" />
+              Add Activity
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {weeklySchedule.map((activity, index) => (
+              <Card key={index} className="bg-[#1c1c1e] border-[#444]">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-white font-medium">Activity {index + 1}</h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeActivity(index)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Day of Week */}
+                    <div>
+                      <Label className="text-white text-sm">Day</Label>
+                      <Select
+                        value={activity.dayOfWeek}
+                        onValueChange={(value) => updateActivity(index, "dayOfWeek", value)}
+                      >
+                        <SelectTrigger className="bg-[#232325] border-[#444] text-white mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#232325] border-[#444]">
+                          {DAYS_OF_WEEK.map((day) => (
+                            <SelectItem key={day.value} value={day.value} className="text-white">
+                              {day.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Time of Day */}
+                    <div>
+                      <Label className="text-white text-sm">Time</Label>
+                      <Select
+                        value={activity.timeOfDay}
+                        onValueChange={(value) => updateActivity(index, "timeOfDay", value)}
+                      >
+                        <SelectTrigger className="bg-[#232325] border-[#444] text-white mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#232325] border-[#444]">
+                          {TIME_OF_DAY_OPTIONS.map((time) => (
+                            <SelectItem key={time.value} value={time.value} className="text-white">
+                              {time.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Intensity */}
+                    <div>
+                      <Label className="text-white text-sm">Intensity</Label>
+                      <Select
+                        value={activity.intensity}
+                        onValueChange={(value) => updateActivity(index, "intensity", value)}
+                      >
+                        <SelectTrigger className="bg-[#232325] border-[#444] text-white mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#232325] border-[#444]">
+                          {INTENSITY_OPTIONS.map((intensity) => (
+                            <SelectItem key={intensity.value} value={intensity.value} className="text-white">
+                              {intensity.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Activity Type */}
+                    <div className="md:col-span-2">
+                      <Label className="text-white text-sm">Activity</Label>
+                      <Select
+                        value={activity.activity}
+                        onValueChange={(value) => updateActivity(index, "activity", value)}
+                      >
+                        <SelectTrigger className="bg-[#232325] border-[#444] text-white mt-1">
+                          <SelectValue placeholder="Select activity type" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#232325] border-[#444]">
+                          {ACTIVITY_TYPE_OPTIONS.map((activityType) => (
+                            <SelectItem key={activityType.value} value={activityType.value} className="text-white">
+                              {activityType.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Duration */}
+                    <div>
+                      <Label className="text-white text-sm">Duration (minutes)</Label>
+                      <Input
+                        type="number"
+                        value={activity.durationMinutes || ""}
+                        onChange={(e) => updateActivity(index, "durationMinutes", parseInt(e.target.value) || 60)}
+                        className="bg-[#232325] border-[#444] text-white mt-1"
+                        min={15}
+                        max={300}
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="md:col-span-2">
+                      <Label className="text-white text-sm">Notes (optional)</Label>
+                      <Input
+                        type="text"
+                        value={activity.notes || ""}
+                        onChange={(e) => updateActivity(index, "notes", e.target.value)}
+                        placeholder="e.g., Upper body focus, outdoor run"
+                        className="bg-[#232325] border-[#444] text-white mt-1"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            <Button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addActivity();
+              }}
+              className="w-full bg-[#ff8e01] hover:bg-[#ff9e2b] text-white"
+            >
+              <Plus size={16} className="mr-2" />
+              Add Another Activity
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
@@ -638,6 +944,13 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
           icon: Target,
           color: "text-purple-400"
         };
+      case 7:
+        return {
+          title: "Weekly Schedule",
+          description: "Tell us about your weekly schedule",
+          icon: Calendar,
+          color: "text-teal-400"
+        };
       default:
         return { title: "", description: "", icon: User, color: "" };
     }
@@ -645,6 +958,11 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
 
   const stepInfo = getStepInfo(currentStep);
   const IconComponent = stepInfo.icon;
+
+  useEffect(() => {
+    setIsOnboarding(true);
+    return () => setIsOnboarding(false);
+  }, [setIsOnboarding]);
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-0">
@@ -691,6 +1009,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             {currentStep === 4 && renderGoalsStep()}
             {currentStep === 5 && renderDietaryStep()}
             {currentStep === 6 && renderFoodPreferencesStep()}
+            {currentStep === 7 && renderWeeklyScheduleStep()}
             <div className="flex flex-col sm:flex-row sm:justify-between pt-6 sm:pt-8 border-t border-[#444] space-y-4 sm:space-y-0">
               <Button
                 type="button"
@@ -715,7 +1034,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
               ) : (
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !isValid}
+                  disabled={isSubmitting}
                   className="bg-[#ff8e01] hover:bg-[#ff9e2b] text-white disabled:opacity-50 w-full sm:w-auto"
                 >
                   {isSubmitting ? (

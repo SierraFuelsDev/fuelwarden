@@ -13,11 +13,17 @@ export default function OnboardingPage() {
   const { user } = useAuth();
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOnboarding, setIsOnboarding] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    console.log("[OnboardingPage] useEffect triggered", { user, isOnboarding });
+    // Don't check profile if onboarding is in progress
+    if (isOnboarding) {
+      return;
+    }
     checkUserProfile();
-  }, [user]);
+  }, [user, isOnboarding]);
 
   const checkUserProfile = async () => {
     if (!user?.$id) {
@@ -28,7 +34,7 @@ export default function OnboardingPage() {
     try {
       const profile = await databaseService.getUserProfile(user.$id);
       if (profile) {
-        // User already has a profile, redirect to dashboard
+        console.log("[OnboardingPage] Profile found, redirecting to dashboard");
         router.push("/dashboard");
       } else {
         setHasProfile(false);
@@ -42,6 +48,7 @@ export default function OnboardingPage() {
   };
 
   const handleOnboardingComplete = () => {
+    setIsOnboarding(false);
     setHasProfile(true);
   };
 
@@ -88,7 +95,7 @@ export default function OnboardingPage() {
           
           {/* Onboarding Form */}
           <div className="w-full">
-            <OnboardingForm onComplete={handleOnboardingComplete} />
+            <OnboardingForm onComplete={handleOnboardingComplete} setIsOnboarding={setIsOnboarding} />
           </div>
           
           {/* Footer */}

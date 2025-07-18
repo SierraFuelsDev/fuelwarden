@@ -25,17 +25,38 @@ The onboarding flow is a clean, multi-step form designed to collect user profile
 - **Bed time** (optional)
 - Helps understand daily rhythm for meal timing
 
-#### Step 3: Preferences & Goals
+#### Step 3: Activities
+- **Activity types** (weightlifting, running, yoga, etc.)
+- Select up to 3 preferred activities
+
+#### Step 4: Goals
+- **Fitness goals** (build muscle, lose weight, improve performance, etc.)
+- Select up to 3 main goals
+
+#### Step 5: Dietary Restrictions
 - **Dietary restrictions** (gluten-free, dairy-free, vegetarian, etc.)
+- Select all that apply
+
+#### Step 6: Food Preferences
 - **Food preferences** (high protein, organic, budget conscious, etc.)
-- **Goals** (build muscle, lose weight, improve performance, etc.)
-- **Activities** (weightlifting, running, yoga, etc.)
-- **Supplements** (protein powder, creatine, etc.)
+- Select all that apply
+
+#### Step 7: Weekly Fitness Schedule
+- **Day of week** (Monday through Sunday)
+- **Time of day** (morning, afternoon, evening)
+- **Activity type** (running, yoga, weightlifting, etc.)
+- **Intensity** (light, moderate, intense)
+- **Duration** (15-300 minutes, optional)
+- **Notes** (optional additional details)
+- Users can add multiple activities per day
+- Skip days are allowed (no validation requiring activities every day)
 
 ### 🔧 Technical Implementation
 
 #### Database Schema
-The form collects data for the `user_profiles` collection with the following structure:
+The form collects data for two collections:
+
+**user_profiles collection:**
 ```typescript
 interface UserProfile {
   userId: string;
@@ -49,7 +70,24 @@ interface UserProfile {
   preferences: string[];
   goals: string[];
   activities: string[];
-  supplements: string[];
+  supplements?: string[];
+}
+```
+
+**activity_schedule collection:**
+```typescript
+interface ActivitySchedule {
+  userId: string;
+  schedule: ActivityScheduleItem[];
+}
+
+interface ActivityScheduleItem {
+  dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+  timeOfDay: "morning" | "afternoon" | "evening";
+  activity: string;
+  intensity: "light" | "moderate" | "intense";
+  durationMinutes?: number;
+  notes?: string;
 }
 ```
 
@@ -58,12 +96,22 @@ interface UserProfile {
 - Real-time validation with `react-hook-form`
 - Step-by-step validation before proceeding
 - Required field validation for preferences and goals
+- Optional weekly schedule (users can skip if they don't have a regular routine)
+
+#### Data Validation & Defaults
+- **Weekly Schedule**: Optional step - users can skip entirely
+- **Empty days**: No validation requiring activities every day
+- **Partial data**: Duration and notes are optional
+- **Defaults**: New activities default to Monday morning, moderate intensity, 60 minutes
+- **Activity limits**: No limit on number of activities per day
+- **Duration limits**: 15-300 minutes with 60-minute default
 
 #### UI Components
 - **shadcn/ui** components for consistency
 - **Tailwind CSS** for styling
 - **Lucide React** icons for visual elements
-- **Responsive grid layouts** for optimal mobile experience
+- **Custom Select component** for dropdowns
+- **Card-based layout** for activity items
 
 ### 🚀 User Experience
 

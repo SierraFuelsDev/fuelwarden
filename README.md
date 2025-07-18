@@ -1,24 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FuelWarden
+
+A personalized meal planning platform for athletes and fitness enthusiasts, powered by AI and built with Next.js and Appwrite.
+
+## Features
+
+- **Multi-step onboarding** with comprehensive profile collection
+- **Weekly fitness schedule** planning with activity tracking
+- **AI-powered meal planning** tailored to your goals and schedule
+- **Meal logging** with nutritional tracking
+- **Personalized recommendations** based on your preferences and restrictions
+- **Responsive design** that works on all devices
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js 18+ 
+- Appwrite account
+- Environment variables configured
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables
+4. Set up Appwrite collections:
+   ```bash
+   npm run setup-user-profiles
+   npm run setup-activity-schedule
+   ```
+5. Start the development server: `npm run dev`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Onboarding Flow
+
+The onboarding process collects:
+
+1. **Basic Information** - Age, sex, weight, height
+2. **Daily Schedule** - Wake-up and bed times (optional)
+3. **Activities** - Preferred fitness activities
+4. **Goals** - Fitness and nutrition goals
+5. **Dietary Restrictions** - Food allergies and preferences
+6. **Food Preferences** - Cooking style and dietary choices
+7. **Weekly Fitness Schedule** - Detailed weekly activity planning
+
+The weekly fitness schedule step allows users to:
+- Plan activities for each day of the week
+- Specify time of day (morning/afternoon/evening)
+- Set activity intensity (light/moderate/intense)
+- Add duration and optional notes
+- Skip days if they don't have a regular routine
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui
+- **Forms**: React Hook Form, Zod validation
+- **Backend**: Appwrite (BaaS)
+- **Database**: Appwrite Database
+- **Authentication**: Appwrite Auth
 
 ## Learn More
 
