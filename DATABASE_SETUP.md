@@ -190,3 +190,14 @@ This will help you verify:
 - Collection existence
 - User authentication
 - Permission configuration 
+
+# Activity Schedule Storage in user_profiles
+
+- The `activitySchedule` field in the `user_profiles` collection is an array of JSON strings.
+- Each string represents an `ActivityScheduleItem` (see code for structure).
+- This is intentional: there is **no separate collection** for activity schedules.
+- The frontend parses these strings into objects for use in the UI.
+- When saving, the frontend serializes each activity as a JSON string.
+
+**Note:**
+If you change this schema in the future, update both the frontend and this documentation. This avoids confusion and errors like trying to use a separate collection. 

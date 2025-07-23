@@ -4,7 +4,7 @@ import { client } from "./appwrite";
 const databases = new Databases(client);
 const DATABASE_ID = "fuelwarden";
 const USER_PROFILES_COLLECTION_ID = "user_profiles";
-const ACTIVITY_SCHEDULE_COLLECTION_ID = "activity_schedule";
+const ACTIVITY_SCHEDULE_COLLECTION_ID = "activitySchedule";
 
 // Form interface (what the frontend uses)
 export interface UserProfileForm {
@@ -216,7 +216,7 @@ class DatabaseService {
 
       const documentData = {
         userId: activitySchedule.userId,
-        activities: activitiesJson
+        activitySchedule: activitiesJson
       };
 
       console.log("[Database] Creating activity schedule with data:", {
@@ -264,14 +264,14 @@ class DatabaseService {
       
       const document = result.documents[0];
       
-      // Parse the activities JSON string back to an array
+      // Parse the activitySchedule JSON string back to an array
       let activities: ActivityScheduleItem[] = [];
       try {
-        if (document.activities && typeof document.activities === 'string') {
-          activities = JSON.parse(document.activities);
+        if (document.activitySchedule && typeof document.activitySchedule === 'string') {
+          activities = JSON.parse(document.activitySchedule);
         }
       } catch (parseError) {
-        console.error("[Database] Failed to parse activities JSON:", parseError);
+        console.error("[Database] Failed to parse activitySchedule JSON:", parseError);
         activities = [];
       }
       
@@ -293,13 +293,11 @@ class DatabaseService {
       const updateData: any = { ...updates };
       if (updates.activities) {
         const activitiesJson = JSON.stringify(updates.activities);
-        
         // Check if the JSON string is too large for Appwrite
         if (activitiesJson.length > 10000) {
           throw new Error("Activity schedule data is too large. Please reduce the number of activities or activity details.");
         }
-        
-        updateData.activities = activitiesJson;
+        updateData.activitySchedule = activitiesJson;
       }
 
       const result = await databases.updateDocument(
