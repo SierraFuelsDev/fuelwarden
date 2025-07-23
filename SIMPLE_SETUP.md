@@ -76,16 +76,14 @@ When a user creates a profile, the document gets these permissions:
 **Attributes:**
 - `userId` (String, required, indexed)
 - `age` (Integer, 13-120, required)
-- `weightPounds` (Float, 50-500, required)
-- `heightInches` (Integer, 48-96, required)
 - `sex` (Enum: Male/Female/Non-Binary/Other, required)
-- `wakeupTime` (String, optional)
-- `bedTime` (String, optional)
+- `weightPounds` (Integer, 50-500, required)
+- `heightInches` (Integer, 48-96, required)
 - `restrictions` (String[], required)
-- `preferences` (String[], required)
-- `goals` (String[], required)
-- `activities` (String[], required)
-- `supplements` (String[], optional)
+- `performanceObjective` (String, optional)
+- `trainingCompetition` (String[], optional)
+- `diet` (String[], optional)
+- `activitySchedule` (String[], optional)
 
 **Index:**
 - `userId` (Key index for fast queries)

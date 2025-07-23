@@ -16,6 +16,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
   checkOnboardingStatus: () => Promise<void>;
+  handleOAuthCallback: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -144,6 +145,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
   };
 
+  const handleOAuthCallback = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      
+      if (currentUser) {
+        await checkOnboardingStatus();
+      }
+    } catch (err: any) {
+      setError(err);
+      console.error('OAuth callback error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -155,6 +175,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: !!user,
     hasCompletedOnboarding,
     checkOnboardingStatus,
+    handleOAuthCallback,
   };
 
   return (

@@ -14,13 +14,11 @@ export interface UserProfileForm {
   weightPounds: number;
   heightInches: number;
   sex: "male" | "female" | "other";
-  wakeupTime?: string;
-  bedTime?: string;
   restrictions: string[];
-  preferences: string[];
-  goals: string[];
-  activities: string[];
-  supplements?: string[];
+  performanceObjective?: string;
+  trainingCompetition?: string[];
+  diet?: string[];
+  activitySchedule?: string[]; // <-- Add this line
   $createdAt?: string;
   $updatedAt?: string;
 }
@@ -33,13 +31,11 @@ export interface UserProfile {
   weightPounds: number;
   heightInches: number;
   sex: "Male" | "Female" | "Non-Binary" | "Other";
-  wakeupTime?: string;
-  bedTime?: string;
   restrictions: string[];
-  preferences: string[];
-  goals: string[];
-  activities: string[];
-  supplements?: string[];
+  performanceObjective?: string;
+  trainingCompetition?: string[];
+  diet?: string[];
+  activitySchedule?: string[]; // <-- Add this line
   $createdAt?: string;
   $updatedAt?: string;
 }
@@ -57,7 +53,7 @@ export interface ActivityScheduleItem {
 export interface ActivityScheduleForm {
   $id?: string;
   userId: string;
-  schedule: ActivityScheduleItem[];
+  activities: ActivityScheduleItem[];
   $createdAt?: string;
   $updatedAt?: string;
 }
@@ -98,7 +94,8 @@ class DatabaseService {
       // Transform the data for database storage
       const dbProfile = {
         ...userProfile,
-        sex: transformSexForDatabase(userProfile.sex)
+        sex: transformSexForDatabase(userProfile.sex),
+        activitySchedule: userProfile.activitySchedule || [], // Ensure activitySchedule is included
       };
 
       const result = await databases.createDocument(
@@ -209,11 +206,30 @@ class DatabaseService {
   // Create activity schedule with document-level permissions
   async createActivitySchedule(activitySchedule: Omit<ActivityScheduleForm, "$id" | "$createdAt" | "$updatedAt">): Promise<ActivityScheduleForm> {
     try {
+      // Convert activities array to JSON string for storage
+      const activitiesJson = JSON.stringify(activitySchedule.activities);
+      
+      // Check if the JSON string is too large for Appwrite
+      if (activitiesJson.length > 10000) {
+        throw new Error("Activity schedule data is too large. Please reduce the number of activities or activity details.");
+      }
+
+      const documentData = {
+        userId: activitySchedule.userId,
+        activities: activitiesJson
+      };
+
+      console.log("[Database] Creating activity schedule with data:", {
+        userId: documentData.userId,
+        activitiesCount: activitySchedule.activities.length,
+        jsonLength: activitiesJson.length
+      });
+
       const result = await databases.createDocument(
         DATABASE_ID,
         ACTIVITY_SCHEDULE_COLLECTION_ID,
         ID.unique(),
-        activitySchedule,
+        documentData,
         [
           Permission.read(Role.user(activitySchedule.userId)),
           Permission.update(Role.user(activitySchedule.userId)),
@@ -221,7 +237,13 @@ class DatabaseService {
         ]
       );
       
-      return result as unknown as ActivityScheduleForm;
+      // Transform back to our expected format
+      const transformedResult = {
+        ...result,
+        activities: activitySchedule.activities // Keep the original array for consistency
+      } as unknown as ActivityScheduleForm;
+      
+      return transformedResult;
     } catch (error: any) {
       throw new Error(`Failed to create activity schedule: ${error.message}`);
     }
@@ -240,7 +262,25 @@ class DatabaseService {
         return null;
       }
       
-      return result.documents[0] as unknown as ActivityScheduleForm;
+      const document = result.documents[0];
+      
+      // Parse the activities JSON string back to an array
+      let activities: ActivityScheduleItem[] = [];
+      try {
+        if (document.activities && typeof document.activities === 'string') {
+          activities = JSON.parse(document.activities);
+        }
+      } catch (parseError) {
+        console.error("[Database] Failed to parse activities JSON:", parseError);
+        activities = [];
+      }
+      
+      const transformedResult = {
+        ...document,
+        activities: activities
+      } as unknown as ActivityScheduleForm;
+      
+      return transformedResult;
     } catch (error: any) {
       throw new Error(`Failed to get activity schedule: ${error.message}`);
     }
@@ -249,16 +289,48 @@ class DatabaseService {
   // Update activity schedule
   async updateActivitySchedule(scheduleId: string, updates: Partial<ActivityScheduleForm>): Promise<ActivityScheduleForm> {
     try {
+      // Convert activities array to JSON string if it's being updated
+      const updateData: any = { ...updates };
+      if (updates.activities) {
+        const activitiesJson = JSON.stringify(updates.activities);
+        
+        // Check if the JSON string is too large for Appwrite
+        if (activitiesJson.length > 10000) {
+          throw new Error("Activity schedule data is too large. Please reduce the number of activities or activity details.");
+        }
+        
+        updateData.activities = activitiesJson;
+      }
+
       const result = await databases.updateDocument(
         DATABASE_ID,
         ACTIVITY_SCHEDULE_COLLECTION_ID,
         scheduleId,
-        updates
+        updateData
       );
       
-      return result as unknown as ActivityScheduleForm;
+      // Transform back to our expected format
+      const transformedResult = {
+        ...result,
+        activities: updates.activities || [] // Keep the original array for consistency
+      } as unknown as ActivityScheduleForm;
+      
+      return transformedResult;
     } catch (error: any) {
       throw new Error(`Failed to update activity schedule: ${error.message}`);
+    }
+  }
+
+  // Delete activity schedule
+  async deleteActivitySchedule(scheduleId: string): Promise<void> {
+    try {
+      await databases.deleteDocument(
+        DATABASE_ID,
+        ACTIVITY_SCHEDULE_COLLECTION_ID,
+        scheduleId
+      );
+    } catch (error: any) {
+      throw new Error(`Failed to delete activity schedule: ${error.message}`);
     }
   }
 
@@ -274,6 +346,45 @@ class DatabaseService {
       }
     } catch (error: any) {
       throw new Error(`Failed to upsert activity schedule: ${error.message}`);
+    }
+  }
+
+  // Test method to verify data saving and retrieval
+  async testOnboardingData(userId: string): Promise<{
+    profile: UserProfileForm | null;
+    activitySchedule: ActivityScheduleForm | null;
+    success: boolean;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    
+    try {
+      // Test profile retrieval
+      const profile = await this.getUserProfile(userId);
+      if (!profile) {
+        errors.push("User profile not found");
+      }
+
+      // Test activity schedule retrieval
+      const activitySchedule = await this.getActivitySchedule(userId);
+      if (!activitySchedule) {
+        errors.push("Activity schedule not found");
+      }
+
+      return {
+        profile,
+        activitySchedule,
+        success: errors.length === 0,
+        errors
+      };
+    } catch (error: any) {
+      errors.push(`Database test failed: ${error.message}`);
+      return {
+        profile: null,
+        activitySchedule: null,
+        success: false,
+        errors
+      };
     }
   }
 }

@@ -11,16 +11,14 @@ Create a database named `fuelwarden` with the following collections:
 - **Attributes**:
   - `userId` (String, required, indexed)
   - `age` (Integer, required)
-  - `weightPounds` (Float, required)
+  - `sex` (Enum, required, values: ["Male", "Female", "Non-Binary", "Other"])
+  - `weightPounds` (Integer, required)
   - `heightInches` (Integer, required)
-  - `sex` (String, required, enum: ["male", "female", "other"])
-  - `wakeupTime` (String, optional)
-  - `bedTime` (String, optional)
   - `restrictions` (String[], required)
-  - `preferences` (String[], required)
-  - `goals` (String[], required)
-  - `activities` (String[], required)
-  - `supplements` (String[], optional)
+  - `performanceObjective` (String, optional)
+  - `trainingCompetition` (String[], optional)
+  - `diet` (String[], optional)
+  - `activitySchedule` (String[], optional)
 
 #### Collection: `meal_logs`
 - **Document ID**: Auto-generated
@@ -50,10 +48,19 @@ Create a database named `fuelwarden` with the following collections:
 - **Document ID**: Auto-generated
 - **Attributes**:
   - `userId` (String, required, indexed)
-  - `date` (String, required, indexed)
-  - `activities` (String, required) // JSON string of activities array
-  - `totalDuration` (Integer, required)
-  - `totalCaloriesBurned` (Integer, required)
+  - `activities` (String, required) // JSON string of activities array with structure:
+    ```json
+    [
+      {
+        "dayOfWeek": "Monday",
+        "timeOfDay": "morning",
+        "activity": "Lift",
+        "intensity": "moderate",
+        "durationMinutes": 60,
+        "notes": "Focus on legs"
+      }
+    ]
+    ```
 
 ### 2. Permissions Configuration
 
@@ -148,8 +155,6 @@ For optimal query performance, create the following indexes:
 
 #### Activity Schedule Collection
 - `userId` (Attribute, Key, Required)
-- `date` (Attribute, Key, Required)
-- `userId_date` (Composite: userId + date)
 
 ### 4. Security Best Practices
 

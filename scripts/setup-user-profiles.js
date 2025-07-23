@@ -99,13 +99,16 @@ async function createUserProfilesCollection() {
     await databases.createIntegerAttribute(DATABASE_ID, COLLECTION_ID, 'age', true, 13, 120);
     await databases.createFloatAttribute(DATABASE_ID, COLLECTION_ID, 'weightPounds', true, 50, 500);
     await databases.createIntegerAttribute(DATABASE_ID, COLLECTION_ID, 'heightInches', true, 48, 96);
-    await databases.createEnumAttribute(DATABASE_ID, COLLECTION_ID, 'sex', ['male', 'female', 'other'], true);
+    await databases.createEnumAttribute(DATABASE_ID, COLLECTION_ID, 'sex', ['Male', 'Female', 'Non-Binary', 'Other'], true);
     
     // Optional attributes
     await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'wakeupTime', 10, false);
     await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'bedTime', 10, false);
+    await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'performanceObjective', 255, false);
     
     // Array attributes
+    await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'trainingCompetition', 255, false, true);
+    await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'diet', 255, false, true);
     await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'restrictions', 255, true, true);
     await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'preferences', 255, true, true);
     await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'goals', 255, true, true);

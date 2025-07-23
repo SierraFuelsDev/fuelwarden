@@ -45,8 +45,8 @@ async function createActivityScheduleCollection() {
     // Required attributes
     await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'userId', 255, true);
     
-    // Array attribute for schedule items
-    await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'schedule', 10000, true, true);
+    // Array attribute for activities
+    await databases.createStringAttribute(DATABASE_ID, COLLECTION_ID, 'activities', 10000, true, true);
     
     logSuccess('activity_schedule attributes created successfully');
     

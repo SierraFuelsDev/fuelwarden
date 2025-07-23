@@ -12,6 +12,11 @@ export function Navigation() {
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const pathname = usePathname();
 
+  // Hide navigation on auth page and onboarding page
+  if (pathname === '/auth' || pathname === '/onboarding') {
+    return null;
+  }
+
   if (loading) {
     return null;
   }
@@ -37,15 +42,15 @@ export function Navigation() {
   return (
     <>
       {/* Top Navigation Bar */}
-      <nav className="w-full bg-[#232325] border-b border-[#333] shadow-lg fixed top-0 z-50">
+      <nav className="w-full bg-sidebar border-b border-sidebar-border shadow-lg fixed top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-[#ff8e01] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">F</span>
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">F</span>
               </div>
-              <span className="text-white font-bold text-xl">FuelWarden</span>
+              <span className="text-sidebar-foreground font-bold text-xl">FuelWarden</span>
             </Link>
 
             {/* User Menu / Auth Button */}
@@ -54,12 +59,12 @@ export function Navigation() {
                 <div className="relative">
                   <Button
                     variant="ghost"
-                    className="text-white hover:bg-[#333] px-3 py-2 rounded-lg"
+                    className="text-sidebar-foreground hover:bg-sidebar-accent px-3 py-2 rounded-lg"
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                   >
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-[#ff8e01] rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold text-sm">
+                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                        <span className="text-primary-foreground font-semibold text-sm">
                           {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                         </span>
                       </div>
@@ -70,11 +75,11 @@ export function Navigation() {
                   </Button>
 
                   {isMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-[#232325] border border-[#333] rounded-lg shadow-lg z-50">
+                    <div className="absolute right-0 mt-2 w-48 bg-sidebar border border-sidebar-border rounded-lg shadow-lg z-50">
                       <div className="py-1">
                         <Link
                           href="/profile"
-                          className="block px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white"
+                          className="block px-4 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           onClick={() => setIsMenuOpen(false)}
                         >
                           Profile Settings
@@ -84,7 +89,7 @@ export function Navigation() {
                             signOut();
                             setIsMenuOpen(false);
                           }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#333] hover:text-white"
+                          className="block w-full text-left px-4 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         >
                           Sign Out
                         </button>
@@ -100,12 +105,12 @@ export function Navigation() {
 
       {/* Bottom Navigation for All Screens */}
       {isAuthenticated && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-[#232325] border-t border-[#333] shadow-lg z-50 flex justify-center items-center">
+        <nav className="fixed bottom-0 left-0 right-0 bg-sidebar border-t border-sidebar-border shadow-lg z-50 flex justify-center items-center">
           <div className="relative flex justify-between items-center w-full max-w-md mx-auto h-16 px-8">
             <Link
               href="/dashboard"
               className={`flex flex-col items-center justify-center flex-1 h-full ${
-                isActive('/dashboard') ? 'text-[#ff8e01]' : 'text-gray-400'
+                isActive('/dashboard') ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
               <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,23 +122,23 @@ export function Navigation() {
             <div className="absolute left-1/2 transform -translate-x-1/2 -top-6 z-10">
               <button
                 onClick={() => setIsQuickActionsOpen(!isQuickActionsOpen)}
-                className="w-14 h-14 bg-[#ff8e01] hover:bg-[#ff9e2b] rounded-full flex items-center justify-center shadow-lg border-4 border-[#232325] focus:outline-none transition-colors"
+                className="w-14 h-14 bg-primary hover:bg-primary/90 rounded-full flex items-center justify-center shadow-lg border-4 border-sidebar focus:outline-none transition-colors"
                 aria-label="Quick Actions"
               >
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </button>
 
               {/* Quick Actions Popup */}
               {isQuickActionsOpen && (
-                <div className="absolute bottom-full mb-4 left-1/2 transform -translate-x-1/2 w-64 bg-[#232325] border border-[#333] rounded-lg shadow-lg z-50">
+                <div className="absolute bottom-full mb-4 left-1/2 transform -translate-x-1/2 w-64 bg-sidebar border border-sidebar-border rounded-lg shadow-lg z-50">
                   <div className="p-4">
-                    <h3 className="text-white font-semibold mb-3 text-center">Quick Actions</h3>
+                    <h3 className="text-sidebar-foreground font-semibold mb-3 text-center">Quick Actions</h3>
                     <div className="space-y-2">
                       <button
                         onClick={() => handleQuickAction('log-meal')}
-                        className="w-full flex items-center space-x-3 p-3 text-left text-gray-300 hover:bg-[#333] hover:text-white rounded-lg transition-colors"
+                        className="w-full flex items-center space-x-3 p-3 text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -142,7 +147,7 @@ export function Navigation() {
                       </button>
                       <button
                         onClick={() => handleQuickAction('add-activity')}
-                        className="w-full flex items-center space-x-3 p-3 text-left text-gray-300 hover:bg-[#333] hover:text-white rounded-lg transition-colors"
+                        className="w-full flex items-center space-x-3 p-3 text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -151,7 +156,7 @@ export function Navigation() {
                       </button>
                       <button
                         onClick={() => handleQuickAction('adjust-schedule')}
-                        className="w-full flex items-center space-x-3 p-3 text-left text-gray-300 hover:bg-[#333] hover:text-white rounded-lg transition-colors"
+                        className="w-full flex items-center space-x-3 p-3 text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -168,7 +173,7 @@ export function Navigation() {
             <Link
               href="/mealPlan"
               className={`flex flex-col items-center justify-center flex-1 h-full ${
-                isActive('/mealPlan') ? 'text-[#ff8e01]' : 'text-gray-400'
+                isActive('/mealPlan') ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
               <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
