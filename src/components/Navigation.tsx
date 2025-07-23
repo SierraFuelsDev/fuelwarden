@@ -41,16 +41,24 @@ export function Navigation() {
 
   return (
     <>
+      {/* Beta Notification Strip */}
+      <div className="w-full bg-orange-500 text-white text-center py-2 text-sm font-medium shadow-md z-[60] fixed top-0 left-0">
+        Mobile App releasing soon! Please enjoy our beta version of FuelWarden
+        <a
+          href="/legal#terms"
+          className="ml-2 underline font-semibold hover:text-orange-200 transition-colors"
+        >
+          Learn more in our terms and conditions
+        </a>
+      </div>
       {/* Top Navigation Bar */}
-      <nav className="w-full bg-sidebar border-b border-sidebar-border shadow-lg fixed top-0 z-50">
+      <nav className="w-full bg-sidebar border-b border-sidebar-border shadow-lg fixed top-[40px] z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">F</span>
-              </div>
-              <span className="text-sidebar-foreground font-bold text-xl">FuelWarden</span>
+              <img src="/logo-1.svg" alt="FuelWarden Logo" className="h-8 w-auto" />
+              <span className="ml-1 px-2 py-0.5 rounded-full bg-orange-500 text-white text-xs font-semibold align-middle">BETA</span>
             </Link>
 
             {/* User Menu / Auth Button */}
@@ -83,6 +91,13 @@ export function Navigation() {
                           onClick={() => setIsMenuOpen(false)}
                         >
                           Profile Settings
+                        </Link>
+                        <Link
+                          href="/legal"
+                          className="block px-4 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Policies & Info
                         </Link>
                         <button
                           onClick={() => {

@@ -50,5 +50,10 @@ export default function HomePage() {
   }
 
   // This should not render as we're redirecting, but just in case
-  return <FullPageSpinner />;
+  return <>
+    <FullPageSpinner />
+    <div className="fixed bottom-4 left-0 w-full flex justify-center z-50">
+      <a href="/legal" className="text-xs text-muted-foreground underline hover:text-primary transition-colors">Policies & Info</a>
+    </div>
+  </>;
 }
