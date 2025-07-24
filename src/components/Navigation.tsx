@@ -9,7 +9,6 @@ import { usePathname } from "next/navigation";
 export function Navigation() {
   const { user, isAuthenticated, signOut, loading } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const pathname = usePathname();
 
   // Hide navigation on auth page and onboarding page
@@ -22,22 +21,6 @@ export function Navigation() {
   }
 
   const isActive = (path: string) => pathname === path;
-
-  const handleQuickAction = (action: string) => {
-    setIsQuickActionsOpen(false);
-    // Handle different quick actions
-    switch (action) {
-      case 'log-meal':
-        // Navigate to meal log or open meal logging modal
-        break;
-      case 'add-activity':
-        // Navigate to activity page or open activity modal
-        break;
-      case 'adjust-schedule':
-        // Navigate to schedule page or open schedule modal
-        break;
-    }
-  };
 
   return (
     <>
@@ -56,7 +39,7 @@ export function Navigation() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/mealPlan" className="flex items-center space-x-2">
               <img src="/logo-1.svg" alt="FuelWarden Logo" className="h-8 w-auto" />
               <span className="ml-1 px-2 py-0.5 rounded-full bg-orange-500 text-white text-xs font-semibold align-middle">BETA</span>
             </Link>
@@ -118,83 +101,37 @@ export function Navigation() {
         </div>
       </nav>
 
-      {/* Bottom Navigation for All Screens */}
+      {/* Simple Bottom Navigation */}
       {isAuthenticated && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-sidebar border-t border-sidebar-border shadow-lg z-50 flex justify-center items-center">
-          <div className="relative flex justify-between items-center w-full max-w-md mx-auto h-16 px-8">
-            <Link
-              href="/dashboard"
-              className={`flex flex-col items-center justify-center flex-1 h-full ${
-                isActive('/dashboard') ? 'text-primary' : 'text-muted-foreground'
-              }`}
-            >
-              <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </Link>
-
-            {/* Quick Actions Button - floating and centered */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 -top-6 z-10">
-              <button
-                onClick={() => setIsQuickActionsOpen(!isQuickActionsOpen)}
-                className="w-14 h-14 bg-primary hover:bg-primary/90 rounded-full flex items-center justify-center shadow-lg border-4 border-sidebar focus:outline-none transition-colors"
-                aria-label="Quick Actions"
+        <nav className="fixed bottom-0 left-0 right-0 bg-sidebar border-t border-sidebar-border shadow-lg z-50">
+          <div className="flex justify-center items-center w-full h-16">
+            <div className="flex w-full max-w-md">
+              {/* Meal Plan Tab */}
+              <Link
+                href="/mealPlan"
+                className={`flex flex-col items-center justify-center flex-1 h-16 transition-colors ${
+                  isActive('/mealPlan') ? 'text-primary' : 'text-muted-foreground hover:text-sidebar-foreground'
+                }`}
               >
-                <svg className="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-              </button>
+                <span className="text-xs font-medium">Plan</span>
+              </Link>
 
-              {/* Quick Actions Popup */}
-              {isQuickActionsOpen && (
-                <div className="absolute bottom-full mb-4 left-1/2 transform -translate-x-1/2 w-64 bg-sidebar border border-sidebar-border rounded-lg shadow-lg z-50">
-                  <div className="p-4">
-                    <h3 className="text-sidebar-foreground font-semibold mb-3 text-center">Quick Actions</h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => handleQuickAction('log-meal')}
-                        className="w-full flex items-center space-x-3 p-3 text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        <span>Log Meal</span>
-                      </button>
-                      <button
-                        onClick={() => handleQuickAction('add-activity')}
-                        className="w-full flex items-center space-x-3 p-3 text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <span>Add Activity</span>
-                      </button>
-                      <button
-                        onClick={() => handleQuickAction('adjust-schedule')}
-                        className="w-full flex items-center space-x-3 p-3 text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span>Adjust Schedule</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Profile/Settings Tab */}
+              <Link
+                href="/profile"
+                className={`flex flex-col items-center justify-center flex-1 h-16 transition-colors ${
+                  isActive('/profile') ? 'text-primary' : 'text-muted-foreground hover:text-sidebar-foreground'
+                }`}
+              >
+                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span className="text-xs font-medium">Profile</span>
+              </Link>
             </div>
-
-            <Link
-              href="/mealPlan"
-              className={`flex flex-col items-center justify-center flex-1 h-full ${
-                isActive('/mealPlan') ? 'text-primary' : 'text-muted-foreground'
-              }`}
-            >
-              <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </Link>
           </div>
         </nav>
       )}
@@ -202,14 +139,6 @@ export function Navigation() {
       {/* Spacer for fixed navigation */}
       <div className="h-16"></div>
       {isAuthenticated && <div className="h-16"></div>}
-
-      {/* Backdrop for quick actions popup */}
-      {isQuickActionsOpen && (
-        <div 
-          className="fixed inset-0 z-40"
-          onClick={() => setIsQuickActionsOpen(false)}
-        />
-      )}
     </>
   );
 } 

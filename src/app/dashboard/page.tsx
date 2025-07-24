@@ -1,128 +1,148 @@
 "use client";
 
 import { useAuth } from "../../contexts/AuthContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { useRouter } from "next/navigation";
+import { Badge } from "../../components/ui/badge";
+import { useEffect, useState } from "react";
+import { databaseService, UserProfileForm, ActivityScheduleItem } from "../../lib/database";
+
+const TIME_BLOCKS = {
+  morning: { start: 6, end: 12 },
+  afternoon: { start: 12, end: 18 },
+  evening: { start: 18, end: 24 },
+};
+
+function getCurrentDayAndTimeBlock() {
+  const now = new Date();
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayOfWeek = days[now.getDay()];
+  const hour = now.getHours();
+  let timeOfDay: "morning" | "afternoon" | "evening" = "morning";
+  if (hour >= 6 && hour < 12) timeOfDay = "morning";
+  else if (hour >= 12 && hour < 18) timeOfDay = "afternoon";
+  else timeOfDay = "evening";
+  return { dayOfWeek, timeOfDay, hour };
+}
+
+function getNextActivity(activities: ActivityScheduleItem[]) {
+  const { dayOfWeek, timeOfDay, hour } = getCurrentDayAndTimeBlock();
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const todayIdx = days.indexOf(dayOfWeek);
+
+  // Flatten activities with their day index and time block start hour
+  const sorted = activities
+    .map((a) => ({
+      ...a,
+      dayIdx: days.indexOf(a.dayOfWeek),
+      blockStart: TIME_BLOCKS[a.timeOfDay].start,
+    }))
+    .sort((a, b) => {
+      if (a.dayIdx !== b.dayIdx) return a.dayIdx - b.dayIdx;
+      return a.blockStart - b.blockStart;
+    });
+
+  // Find the next activity today or later in the week
+  for (let offset = 0; offset < 7; offset++) {
+    const checkDayIdx = (todayIdx + offset) % 7;
+    const isToday = offset === 0;
+    const candidates = sorted.filter((a) => a.dayIdx === checkDayIdx);
+    for (const act of candidates) {
+      if (
+        (isToday && act.blockStart > hour) ||
+        (!isToday)
+      ) {
+        return act;
+      }
+    }
+  }
+  return null;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [nextWorkout, setNextWorkout] = useState<ActivityScheduleItem | null>(null);
+  // Remove mealPlan and upcomingMeal state
 
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case "log-meal":
-        router.push("/mealLog");
-        break;
-      case "plan-meals":
-        router.push("/mealPlan");
-        break;
-      case "view-progress":
-        // This could be a progress page or analytics
-        console.log("View progress clicked");
-        break;
-      default:
-        break;
+  useEffect(() => {
+    async function fetchProfile() {
+      if (!user?.$id) return;
+      setLoading(true);
+      setError("");
+      try {
+        const profile: UserProfileForm | null = await databaseService.getUserProfile(user.$id);
+        let activities: ActivityScheduleItem[] = [];
+        if (profile && Array.isArray(profile.activitySchedule)) {
+          activities = profile.activitySchedule
+            .map(item => {
+              try {
+                return typeof item === "string" ? JSON.parse(item) : item;
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean) as ActivityScheduleItem[];
+        }
+        if (activities.length > 0) {
+          const next = getNextActivity(activities);
+          setNextWorkout(next);
+        } else {
+          setNextWorkout(null);
+        }
+        // Remove meal plan fetching logic
+      } catch (e: any) {
+        setError(e.message || "Failed to load profile");
+        setNextWorkout(null);
+        // Remove meal plan error handling
+      } finally {
+        setLoading(false);
+      }
     }
-  };
+    fetchProfile();
+  }, [user]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground mt-2">Welcome back, {user?.name || 'User'}!</p>
       </div>
-      
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Today's Overview */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-card-foreground">Today's Overview</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Your nutrition summary for today
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Calories</span>
-                <span className="text-card-foreground font-semibold">0 / 2000</span>
+      {/* Remove upcoming meal overview */}
+      <div className="space-y-6">
+        {loading ? (
+          <div>Loading...</div>
+        ) : error ? (
+          <div className="text-red-500">{error}</div>
+        ) : nextWorkout ? (
+          <Card className="bg-card">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">Upcoming Workout</CardTitle>
+                <Badge variant="secondary">{nextWorkout.activity}</Badge>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Protein</span>
-                <span className="text-card-foreground font-semibold">0g / 150g</span>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-medium">{nextWorkout.activity}</p>
+                  <p className="text-sm text-muted-foreground">{nextWorkout.dayOfWeek}, {nextWorkout.timeOfDay.charAt(0).toUpperCase() + nextWorkout.timeOfDay.slice(1)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">{nextWorkout.durationMinutes || 60} min</p>
+                  <p className="text-sm text-muted-foreground">{nextWorkout.intensity}</p>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Carbs</span>
-                <span className="text-card-foreground font-semibold">0g / 250g</span>
+              <div className="flex gap-2 mt-2">
+                <Button className="flex-1">Start Workout</Button>
+                <Button variant="outline" className="flex-1">Reschedule</Button>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fat</span>
-                <span className="text-card-foreground font-semibold">0g / 65g</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Today's Meal Plan */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-card-foreground">Daily Fueling</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Your planned meals for today
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">Breakfast</div>
-                <div className="text-card-foreground">No meal planned</div>
-              </div>
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">Lunch</div>
-                <div className="text-card-foreground">No meal planned</div>
-              </div>
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-sm text-muted-foreground">Dinner</div>
-                <div className="text-card-foreground">No meal planned</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-card-foreground">Quick Actions</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Common tasks and shortcuts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <Button 
-                onClick={() => handleQuickAction("log-meal")}
-                className="w-full"
-              >
-                Log Today's Meal
-              </Button>
-              <Button 
-                onClick={() => handleQuickAction("plan-meals")}
-                variant="outline"
-                className="w-full"
-              >
-                Plan Tomorrow's Meals
-              </Button>
-              <Button 
-                onClick={() => handleQuickAction("view-progress")}
-                variant="outline"
-                className="w-full"
-              >
-                View Progress
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="text-muted-foreground">No upcoming workouts scheduled.</div>
+        )}
       </div>
     </div>
   );

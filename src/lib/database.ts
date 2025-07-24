@@ -5,6 +5,7 @@ const databases = new Databases(client);
 const DATABASE_ID = "fuelwarden";
 const USER_PROFILES_COLLECTION_ID = "user_profiles";
 const ACTIVITY_SCHEDULE_COLLECTION_ID = "activitySchedule";
+const MEAL_PLANS_COLLECTION_ID = "meal_plans";
 
 // Form interface (what the frontend uses)
 export interface UserProfileForm {
@@ -54,6 +55,57 @@ export interface ActivityScheduleForm {
   $id?: string;
   userId: string;
   activities: ActivityScheduleItem[];
+  $createdAt?: string;
+  $updatedAt?: string;
+}
+
+// Meal Plan interfaces
+export interface MealPlanItem {
+  dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+  meals: {
+    breakfast?: MealItem;
+    lunch?: MealItem;
+    dinner?: MealItem;
+    snacks?: MealItem[];
+  };
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  notes?: string;
+}
+
+export interface MealItem {
+  name: string;
+  description?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  ingredients: string[];
+  instructions?: string[];
+  prepTime?: number; // in minutes
+  cookTime?: number; // in minutes
+  difficulty?: "easy" | "medium" | "hard";
+  tags?: string[]; // e.g., ["high-protein", "quick", "vegetarian"]
+}
+
+export interface MealPlan {
+  $id?: string;
+  userId: string;
+  status: "draft" | "active" | "archived";
+  version: number;
+  generatedAt: string;
+  planDateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  meals: MealPlanItem[]; // 7 days
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  type?: string;
   $createdAt?: string;
   $updatedAt?: string;
 }
@@ -383,6 +435,53 @@ class DatabaseService {
         success: false,
         errors
       };
+    }
+  }
+
+  // Get user's current meal plan
+  async getCurrentMealPlan(userId: string): Promise<MealPlan | null> {
+    try {
+      const result = await databases.listDocuments(
+        DATABASE_ID,
+        MEAL_PLANS_COLLECTION_ID,
+        [
+          Query.equal("userId", userId),
+          Query.equal("status", "active"),
+          Query.orderDesc("$createdAt"),
+          Query.limit(1)
+        ]
+      );
+      
+      if (result.documents.length === 0) {
+        return null;
+      }
+      
+      const document = result.documents[0];
+      
+      // Parse JSON fields
+      let meals: MealPlanItem[] = [];
+      let planDateRange: { startDate: string; endDate: string } = { startDate: "", endDate: "" };
+      
+      try {
+        if (document.meals && typeof document.meals === 'string') {
+          meals = JSON.parse(document.meals);
+        }
+        if (document.planDateRange && typeof document.planDateRange === 'string') {
+          planDateRange = JSON.parse(document.planDateRange);
+        }
+      } catch (parseError) {
+        console.error("[Database] Failed to parse meal plan JSON:", parseError);
+      }
+      
+      const transformedResult = {
+        ...document,
+        meals,
+        planDateRange,
+      } as unknown as MealPlan;
+      
+      return transformedResult;
+    } catch (error: any) {
+      throw new Error(`Failed to get current meal plan: ${error.message}`);
     }
   }
 }
